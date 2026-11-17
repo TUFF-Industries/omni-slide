@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { filesFromDrop, hasFiles, importFiles, type Progress } from '../import';
+import { filesFromDrop, hasFiles, IMPORT_ACCEPT, importFiles, type Progress } from '../import';
 import {
   insertColumn,
   insertRow,
@@ -60,7 +60,7 @@ export default function EditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [cellWidth, setCellWidth] = useState(loadZoom);
   const [dragOver, setDragOver] = useState(false);
-  const pdfInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
   const historyRef = useRef<History<Deck> | null>(null);
   const deck = history === undefined ? undefined : (history?.present ?? null);
 
@@ -165,16 +165,22 @@ export default function EditorPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, commit, remove, navigate, undoLast, redoNext]);
 
-  async function addPdfs(files: File[]) {
+  async function addFiles(files: File[]) {
     const h = historyRef.current;
     if (!h || files.length === 0) return;
     setError(null);
     try {
       const next = await importFiles(h.present, files, setProgress);
       // importFiles saves the deck itself, after each file.
-      update(record(historyRef.current ?? h, next), false);
+      if (next !== h.present) update(record(historyRef.current ?? h, next), false);
     } catch (e) {
-      setError(`Could not import PDF: ${(e as Error).message}`);
+      setError(`Could not import: ${(e as Error).message}`);
+      // importFiles saves after each file, so files before the failing one may already be in the
+      // stored deck. Pick that up, or the next edit would save over it.
+      const saved = await getDeck(h.present.id);
+      if (saved && saved.updatedAt !== h.present.updatedAt) {
+        update(record(historyRef.current ?? h, saved), false);
+      }
     } finally {
       setProgress(null);
     }
@@ -202,7 +208,7 @@ export default function EditorPage() {
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        addPdfs(filesFromDrop(e));
+        addFiles(filesFromDrop(e));
       }}
     >
       <header className="topbar">
@@ -246,7 +252,7 @@ export default function EditorPage() {
             onChange={(e) => setCellWidth(Number(e.target.value))}
           />
         </label>
-        <button onClick={() => pdfInput.current?.click()}>Import PDF</button>
+        <button onClick={() => importInput.current?.click()}>Import PDF / PPTX</button>
         <button
           onClick={async () => download(await exportDeck(deck), `${safeFilename(deck.name)}.omni`)}
         >
@@ -260,16 +266,16 @@ export default function EditorPage() {
           ▶ Present
         </button>
         <input
-          ref={pdfInput}
+          ref={importInput}
           type="file"
-          accept="application/pdf,.pdf"
+          accept={IMPORT_ACCEPT}
           multiple
           hidden
-          data-testid="pdf-input"
+          data-testid="import-input"
           onChange={(e) => {
             const fs = Array.from(e.target.files ?? []);
             e.target.value = '';
-            addPdfs(fs);
+            addFiles(fs);
           }}
         />
       </header>
@@ -310,9 +316,11 @@ export default function EditorPage() {
         {isEmpty ? (
           <div className="empty-state">
             <h2>No slides yet</h2>
-            <p className="muted">Drop a PDF here or import one. Each page becomes a slide.</p>
-            <button className="primary" onClick={() => pdfInput.current?.click()}>
-              Import PDF
+            <p className="muted">
+              Drop a PDF or PowerPoint (.pptx) here, or import one. Each page becomes a slide.
+            </p>
+            <button className="primary" onClick={() => importInput.current?.click()}>
+              Import PDF / PPTX
             </button>
           </div>
         ) : (

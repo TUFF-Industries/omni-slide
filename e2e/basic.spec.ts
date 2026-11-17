@@ -32,7 +32,7 @@ test('import a PDF, arrange on the grid, present in four directions, export/impo
   await page.getByRole('button', { name: 'New deck' }).click();
   await expect(page.getByLabel('Deck name')).toHaveValue('Untitled deck');
 
-  await page.getByTestId('pdf-input').setInputFiles({
+  await page.getByTestId('import-input').setInputFiles({
     name: 'test.pdf',
     mimeType: 'application/pdf',
     buffer: await makePdf(3),
@@ -97,7 +97,7 @@ test('import a PDF, arrange on the grid, present in four directions, export/impo
 
 test('editor keyboard: select, move with shift+arrows, delete', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('home-pdf-input').setInputFiles({
+  await page.getByTestId('home-import-input').setInputFiles({
     name: 'two.pdf',
     mimeType: 'application/pdf',
     buffer: await makePdf(2),
@@ -117,7 +117,7 @@ test('editor keyboard: select, move with shift+arrows, delete', async ({ page })
 
 test('editor undo/redo: moves, deletes (with images), and renames', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('home-pdf-input').setInputFiles({
+  await page.getByTestId('home-import-input').setInputFiles({
     name: 'three.pdf',
     mimeType: 'application/pdf',
     buffer: await makePdf(3),

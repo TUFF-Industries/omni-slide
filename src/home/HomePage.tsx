@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { filesFromDrop, hasFiles, importFiles, type Progress } from '../import';
+import {
+  baseName,
+  checkUnsupported,
+  filesFromDrop,
+  hasFiles,
+  IMPORT_ACCEPT,
+  importFiles,
+  isImportable,
+  type Progress,
+} from '../import';
 import { slideAt } from '../model/grid';
 import type { Deck } from '../model/types';
 import { startPresenting } from '../present/start';
@@ -16,7 +25,7 @@ export default function HomePage() {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const omniInput = useRef<HTMLInputElement>(null);
-  const pdfInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
 
   const refresh = () => listDecks().then(setDecks);
   useEffect(() => {
@@ -28,16 +37,23 @@ export default function HomePage() {
     navigate(`/deck/${d.id}`);
   }
 
-  async function newDeckFromPdfs(files: File[]) {
-    if (files.length === 0) return;
+  async function newDeckFromFiles(files: File[]) {
     setError(null);
-    const name = files[0].name.replace(/\.pdf$/i, '');
-    let d = await createDeck(name);
+    const usable = files.filter(isImportable);
+    if (usable.length === 0) {
+      try {
+        checkUnsupported(files);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      return;
+    }
+    let d = await createDeck(baseName(usable[0].name));
     try {
       d = await importFiles(d, files, setProgress);
       navigate(`/deck/${d.id}`);
     } catch (e) {
-      setError(`Could not import PDF: ${(e as Error).message}`);
+      setError(`Could not import: ${(e as Error).message}`);
       refresh();
     } finally {
       setProgress(null);
@@ -85,7 +101,7 @@ export default function HomePage() {
         setDragOver(false);
         const omni = Array.from(e.dataTransfer.files).find((f) => f.name.endsWith('.omni'));
         if (omni) importOmni(omni);
-        else newDeckFromPdfs(filesFromDrop(e));
+        else newDeckFromFiles(filesFromDrop(e));
       }}
     >
       <header className="topbar">
@@ -95,7 +111,7 @@ export default function HomePage() {
         </div>
         <div className="spacer" />
         <button onClick={() => omniInput.current?.click()}>Open .omni file</button>
-        <button onClick={() => pdfInput.current?.click()}>New from PDF</button>
+        <button onClick={() => importInput.current?.click()}>New from PDF / PPTX</button>
         <button className="primary" onClick={newDeck}>
           New deck
         </button>
@@ -112,16 +128,16 @@ export default function HomePage() {
           }}
         />
         <input
-          ref={pdfInput}
+          ref={importInput}
           type="file"
-          accept="application/pdf,.pdf"
+          accept={IMPORT_ACCEPT}
           multiple
           hidden
-          data-testid="home-pdf-input"
+          data-testid="home-import-input"
           onChange={(e) => {
             const fs = Array.from(e.target.files ?? []);
             e.target.value = '';
-            newDeckFromPdfs(fs);
+            newDeckFromFiles(fs);
           }}
         />
       </header>
@@ -133,10 +149,10 @@ export default function HomePage() {
             <h1>Presentations that move in four directions</h1>
             <p className="muted">
               Lay slides out on a grid. When presenting, ← → move along a row and ↑ ↓ move along a
-              column. Drop a PDF anywhere on this page to get started.
+              column. Drop a PDF or PowerPoint (.pptx) anywhere on this page to get started.
             </p>
-            <button className="primary" onClick={() => pdfInput.current?.click()}>
-              Import a PDF
+            <button className="primary" onClick={() => importInput.current?.click()}>
+              Import PDF or PPTX
             </button>
           </div>
         )}

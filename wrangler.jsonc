@@ -1,0 +1,12 @@
+// Omni Slide is a static site: this Worker only serves the files in dist/ (no server code).
+// Deploy with `npm run deploy`.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "omni-slide",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+  },
+  "routes": [{ "pattern": "omni.salken.dev", "custom_domain": true }],
+  "workers_dev": false,
+}
