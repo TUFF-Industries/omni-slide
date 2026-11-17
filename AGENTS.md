@@ -11,11 +11,12 @@ toward an empty cell does nothing.
 
 Roadmap:
 
-1. **Done:** PDF import, arrange on grid, present mode, `.omni` export/import.
-2. **Next:** PPTX import.
-3. **Then:** native slide editor (text/images/shapes).
+1. **Done:** PDF import, arrange on grid, present mode, `.omni` export/import, undo/redo.
+2. **Done:** PPTX import (rendered to image slides).
+3. **Next:** native slide editor (text/images/shapes).
 
-No backend. All data lives in the browser (IndexedDB).
+No backend. All data lives in the browser (IndexedDB). Production is a Cloudflare static-assets
+Worker on omni.salken.dev (`wrangler.jsonc`, `npm run deploy`).
 
 ## Commands
 
@@ -28,6 +29,7 @@ npm run lint     # eslint
 npx tsc -b       # typecheck (also part of npm run build)
 npm run format   # prettier
 npm run build    # static output in dist/
+npm run deploy   # build + wrangler deploy to omni.salken.dev (needs `wrangler login`)
 ```
 
 Before pushing, run: `npx tsc -b && npm run lint && npm test && npm run e2e`. Run `npm run format`
@@ -35,8 +37,8 @@ on changed files.
 
 ## Stack
 
-React 19, Vite 8, TypeScript 5.9, react-router (HashRouter), `idb`, `fflate`, `pdfjs-dist`.
-Playwright + `pdf-lib` (generates test PDFs) for e2e.
+React 19, Vite 8, TypeScript 5.9, react-router (HashRouter), `idb`, `fflate`, `pdfjs-dist`,
+`pptxtojson` (parses .pptx). Playwright + `pdf-lib` / `pptxgenjs` (generate test files) for e2e.
 
 ## Layout
 
@@ -49,14 +51,19 @@ src/storage/db.ts     IndexedDB: `decks` store (Deck JSON) and `assets` store (i
 src/storage/assetUrl.ts  Cached object URLs for assets + useAssetUrl hook
 src/storage/assetTrash.ts  syncAssets(prev, next): deletes/restores assets as slides leave/return
 src/storage/file.ts   .omni export/import (zip: deck.json + assets/<assetId>)
-src/import/index.ts   importFiles(): one new row per PDF; lazy-loads pdf.ts
+src/import/index.ts   importFiles(): one new row per PDF/PPTX; lazy-loads pdf.ts / pptx.ts
 src/import/pdf.ts     pdf.js renders pages to WebP/PNG (~1920px long edge)
+src/import/pptx.ts    pptxtojson parses slides; each is laid out as HTML and rasterized
+src/import/pptxHtml.ts  Pure slide JSON → HTML (in pt). Unit-tested. pptxChart.ts draws charts.
+src/import/raster.ts  Shared canvas encoding + HTML→image via SVG foreignObject
 src/home/             Deck list
 src/editor/           Grid editor (GridCanvas does pointer-based drag & drop)
 src/present/          Present mode, Minimap, startPresenting() helper
 src/ui/               Shared components (SlideImage, ImportProgress)
 src/styles.css        All styles, one global sheet, CSS variables on :root
 e2e/basic.spec.ts     End-to-end flow
+e2e/pptx.spec.ts      PPTX import (checks rendered pixels)
+public/_headers       Production security headers (CSP); applied by Cloudflare, not vite preview
 ```
 
 ## Data model rules
@@ -98,6 +105,15 @@ e2e/basic.spec.ts     End-to-end flow
   with Chrome, point `PW_CHROMIUM_PATH` at `Google Chrome.app/Contents/MacOS/Google Chrome` to run
   e2e without downloading a browser.
 - Each Playwright browser context has its own IndexedDB, so tests don't share decks.
+- **PPTX rendering** draws HTML through an SVG `<foreignObject>` image. That sandbox can't load
+  anything external, so every image in the markup must be a data URL (pptxtojson's
+  `imageMode: 'base64'`), and markup must be XHTML (see `toXhtml` in `pptx.ts`). Only fonts
+  installed on the user's machine are available; `fontStack()` adds fallbacks.
+- Import `pptxtojson` by package name (Vite picks its ESM build). In plain Node its `main` is a UMD
+  file, so scripts need `pptxtojson/dist/index.js`.
+- The CSP in `public/_headers` only applies on Cloudflare. To e2e-test with it, run
+  `npm run build && npx wrangler dev --port 8799` and `E2E_BASE_URL=http://localhost:8799 npm run e2e`.
+  A new feature that loads from another origin, uses `eval`, or inline scripts needs a CSP change.
 
 ## Conventions
 
