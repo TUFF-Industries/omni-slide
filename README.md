@@ -15,6 +15,8 @@ Done:
   that aren't installed fall back to similar ones, and video/audio show as a placeholder. Old
   `.ppt` files need saving as `.pptx` first.
 - Arrange slides on a grid by dragging (or select + Shift+arrows). Insert rows/columns, delete, set the start slide.
+- 3D editor: switch the editor to 3D to see every layer stacked in depth. Drag slides between
+  layers (or onto a new one behind), drag empty space to orbit, scroll to zoom.
 - Layers: slides can sit behind other slides. In the editor, pick a layer with the tabs (or Z / X)
   and push the selected slide in or out with Shift+Z / Shift+X. When presenting, Z dives in and X
   comes back out.

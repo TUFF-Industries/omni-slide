@@ -29,13 +29,13 @@ export interface Viewport {
   height: number;
 }
 
-/** Scene position of a slide tile's top-left corner. */
-export function tileOrigin(p: Pos): Vec3 {
-  return { x: p.x * (TILE_W + GAP), y: p.y * (TILE_H + GAP), z: p.z ? -p.z * LAYER_GAP : 0 };
+/** Scene position of a slide tile's top-left corner. `layerGap` is the distance between layers. */
+export function tileOrigin(p: Pos, layerGap = LAYER_GAP): Vec3 {
+  return { x: p.x * (TILE_W + GAP), y: p.y * (TILE_H + GAP), z: p.z ? -p.z * layerGap : 0 };
 }
 
-export function tileCenter(p: Pos): Vec3 {
-  const o = tileOrigin(p);
+export function tileCenter(p: Pos, layerGap = LAYER_GAP): Vec3 {
+  const o = tileOrigin(p, layerGap);
   return { x: o.x + TILE_W / 2, y: o.y + TILE_H / 2, z: o.z };
 }
 
@@ -61,9 +61,10 @@ export function overviewCamera(
   b: Bounds,
   vp: Viewport,
   angles: { pitch: number; yaw: number },
+  layerGap = LAYER_GAP,
 ): Camera {
-  const a = tileOrigin({ x: b.minX, y: b.minY, z: b.minZ });
-  const c = tileOrigin({ x: b.maxX, y: b.maxY, z: b.maxZ });
+  const a = tileOrigin({ x: b.minX, y: b.minY, z: b.minZ }, layerGap);
+  const c = tileOrigin({ x: b.maxX, y: b.maxY, z: b.maxZ }, layerGap);
   const w = c.x - a.x + TILE_W;
   const h = c.y - a.y + TILE_H;
   const d = a.z - c.z;

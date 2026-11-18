@@ -60,7 +60,8 @@ src/import/pptx.ts    pptxtojson parses slides; each is laid out as HTML and ras
 src/import/pptxHtml.ts  Pure slide JSON → HTML (in pt). Unit-tested. pptxChart.ts draws charts.
 src/import/raster.ts  Shared canvas encoding + HTML→image via SVG foreignObject
 src/home/             Deck list
-src/editor/           Grid editor (GridCanvas does pointer-based drag & drop)
+src/editor/           Grid editor: GridCanvas (2D, one layer) and Grid3D (every layer as a plane
+                      in 3D); both use useCellDrag for pointer select + drag & drop
 src/present/          Present mode (cube transitions in styles.css), Overview3D (M),
                       camera.ts (pure 3D camera math, unit-tested), startPresenting()
 src/ui/               Shared components (SlideImage, ImportProgress)
@@ -112,6 +113,11 @@ public/_headers       Production security headers (CSP); applied by Cloudflare, 
   `.scene3d` is `preserve-3d`, stages are cube faces (`--half-w`/`--half-h` deep). Anything that
   flattens 3D on those ancestors (`overflow` other than visible, `opacity` < 1, `filter`) kills
   the effect; keep such styles off `.scene3d` and `.ov-scene`.
+- **3D editor** (`Grid3D`): each layer is a flat CSS-grid "plate" of ordinary cells placed in a
+  `preserve-3d` scene, so drag & drop is the same DOM hit-testing as 2D. Cells find their layer from
+  the nearest `[data-layer]` (`cellPos`). Layers overlap on screen at an angle, so 3D hit-testing
+  (`cellAtPoint3D`) takes the cell with the nearest projected centre from `elementsFromPoint`.
+  `.grid3d` has `perspective`, which makes it the containing block for "fixed" children.
 - The overview handles Escape/M in a **capture-phase** keydown listener and stops propagation, so
   it can fly back before closing and Escape doesn't also exit present mode. Keep `FLY_MS` in
   `Overview3D.tsx` in sync with the `.ov-scene` transition.
