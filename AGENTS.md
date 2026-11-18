@@ -5,7 +5,7 @@ repo, so keep changes focused and go through PRs.
 
 ## What this is
 
-A static web app (to be hosted at omni.salken.dev) for presentations navigable in four directions.
+A static web app (live at https://omni.salken.dev) for presentations navigable in four directions.
 Slides sit on a grid: in present mode ← → move along a row, ↑ ↓ move along a column, and Z / X
 move in and out of **layers** (slides sitting behind other slides at the same column and row).
 Moving toward an empty cell does nothing.
@@ -13,8 +13,10 @@ Moving toward an empty cell does nothing.
 Roadmap:
 
 1. **Done:** PDF import, arrange on grid, present mode, `.omni` export/import, undo/redo.
-2. **Done:** PPTX import (rendered to image slides).
-3. **Next:** native slide editor (text/images/shapes).
+2. **Done:** PPTX import (rendered to image slides); big-import hardening for phones/Safari.
+3. **Done:** layers (depth axis), 3D present mode (cube transitions + M overview), 3D editor view.
+4. **Next:** polish the 3D editor (see "Known issues and follow-ups"), then a native slide editor
+   (text/images/shapes).
 
 No backend. All data lives in the browser (IndexedDB). Production is a Cloudflare static-assets
 Worker on omni.salken.dev (`wrangler.jsonc`, `npm run deploy`).
@@ -66,8 +68,11 @@ src/present/          Present mode (cube transitions in styles.css), Overview3D 
                       camera.ts (pure 3D camera math, unit-tested), startPresenting()
 src/ui/               Shared components (SlideImage, ImportProgress)
 src/styles.css        All styles, one global sheet, CSS variables on :root
-e2e/basic.spec.ts     End-to-end flow
+e2e/basic.spec.ts     End-to-end flow (import, arrange, present, export/import, undo)
 e2e/pptx.spec.ts      PPTX import (checks rendered pixels)
+e2e/thumbs.spec.ts    Grid uses 640px thumbnails, present mode the full image
+e2e/layers.spec.ts    Layers in editor + present, 3D overview pick/orbit/Esc
+e2e/editor3d.spec.ts  3D editor: drag across layers, new layer, orbit, persistence
 public/_headers       Production security headers (CSP); applied by Cloudflare, not vite preview
 ```
 
@@ -146,6 +151,43 @@ public/_headers       Production security headers (CSP); applied by Cloudflare, 
 - The CSP in `public/_headers` only applies on Cloudflare. To e2e-test with it, run
   `npm run build && npx wrangler dev --port 8799` and `E2E_BASE_URL=http://localhost:8799 npm run e2e`.
   A new feature that loads from another origin, uses `eval`, or inline scripts needs a CSP change.
+
+## Known issues and follow-ups
+
+State as of 2026-11-18 (after PR #9). Pick from here; remove items as they're done.
+
+**3D editor (`Grid3D`), works but needs polish:**
+
+- No panning: the camera only orbits and zooms around the deck's centre, so in a big deck you
+  can't zoom in on a corner. Add pan (e.g. right-drag / Shift-drag / two-finger scroll) by moving
+  `Camera.target`.
+- Orbit isn't limited for editing: yaw goes to ±80°, which turns layers edge-on and unusable.
+  Tighter limits for the editor (and maybe snap-back) would help; "Reset view" is the escape.
+- Fitting frames the whole deck plus the empty ring and the extra "New layer", so big or wide
+  decks start very small. Consider fitting the active layer or the selection.
+- Overlapping layers: the picker takes the cell with the nearest projected centre
+  (`cellAtPoint3D`); with many layers or steep angles the target can still be ambiguous. A clearer
+  drop preview (e.g. highlight the whole target layer) would help.
+- Touch: one-finger orbit and slide drag go through pointer events, but there's no pinch-to-zoom
+  on touch screens (only wheel / trackpad ctrl+wheel). Not tested on touch or Safari/Firefox.
+- Thumbnails (640px) get soft when zoomed in close; labels/badges are small when zoomed out.
+- Performance with hundreds of slides × several layers is untested in 3D (each plate renders
+  `(cols+2) × (rows+2)` cells; `SlideCell` isn't memoized).
+
+**Elsewhere:**
+
+- The big-import fixes (thumbnails, JPEG fallback, canvas release, incremental saves) were made
+  for a 262-page PDF that "loaded nothing" on an unknown device; not yet confirmed on an iPhone.
+- 3D present mode (cube transitions, overview) not yet checked on phones or Safari.
+- PPTX: charts made by pptxgenjs show index labels (pptxtojson doesn't read their category
+  format; PowerPoint-made files are fine); fonts not installed locally fall back to similar ones;
+  a flipped group mirrors its text; video/audio are placeholders.
+- Deploys are manual (`npm run deploy`). Auto-deploy from GitHub would need a Cloudflare API token
+  as a repo secret (not created).
+- E2E against production (`E2E_BASE_URL=https://omni.salken.dev npm run e2e`) can flake when the
+  Mac's display sleeps (`CVDisplayLinkCreateWithCGDisplay` errors); re-run before suspecting the
+  site.
+- Not this repo: salken.dev itself and its other subdomains return Cloudflare 525.
 
 ## Conventions
 
