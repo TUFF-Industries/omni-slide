@@ -31,6 +31,7 @@ import { emptyTrash, syncAssets } from '../storage/assetTrash';
 import { getDeck, saveDeck } from '../storage/db';
 import { download, exportDeck, safeFilename } from '../storage/file';
 import ImportProgress from '../ui/ImportProgress';
+import Grid3D from './Grid3D';
 import GridCanvas from './GridCanvas';
 
 const ARROWS: Record<string, Dir> = {
@@ -43,8 +44,18 @@ const ARROWS: Record<string, Dir> = {
 const DEPTH_KEYS: Record<string, Dir> = { z: 'in', x: 'out' };
 
 const ZOOM_KEY = 'omni.cellWidth';
+const VIEW_KEY = 'omni.editorView';
+type View = '2d' | '3d';
 
 const MOD = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl+';
+
+function loadView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === '3d' ? '3d' : '2d';
+  } catch {
+    return '2d';
+  }
+}
 
 function loadZoom(): number {
   try {
@@ -67,6 +78,7 @@ export default function EditorPage() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cellWidth, setCellWidth] = useState(loadZoom);
+  const [view, setView] = useState<View>(loadView);
   const [dragOver, setDragOver] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
   const historyRef = useRef<History<Deck> | null>(null);
@@ -87,10 +99,11 @@ export default function EditorPage() {
   useEffect(() => {
     try {
       localStorage.setItem(ZOOM_KEY, String(cellWidth));
+      localStorage.setItem(VIEW_KEY, view);
     } catch {
       /* per-viewer convenience only */
     }
-  }, [cellWidth]);
+  }, [cellWidth, view]);
 
   /** Switch to a new history state, persisting the deck and its assets if the deck changed. */
   const update = useCallback((h: History<Deck>, save = true) => {
@@ -295,17 +308,34 @@ export default function EditorPage() {
             ↷
           </button>
         </div>
-        <label className="zoom">
-          <span className="muted small">Zoom</span>
-          <input
-            type="range"
-            min={100}
-            max={480}
-            step={10}
-            value={cellWidth}
-            onChange={(e) => setCellWidth(Number(e.target.value))}
-          />
-        </label>
+        <div className="view-toggle" role="group" aria-label="Editor view">
+          {(['2d', '3d'] as const).map((v) => (
+            <button
+              key={v}
+              aria-pressed={view === v}
+              title={
+                v === '3d' ? 'See and arrange every layer in 3D' : 'Flat grid, one layer at a time'
+              }
+              onClick={() => setView(v)}
+            >
+              {v.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        {view === '2d' && (
+          // In 3D, zoom with the scroll wheel instead.
+          <label className="zoom">
+            <span className="muted small">Zoom</span>
+            <input
+              type="range"
+              min={100}
+              max={480}
+              step={10}
+              value={cellWidth}
+              onChange={(e) => setCellWidth(Number(e.target.value))}
+            />
+          </label>
+        )}
         <button onClick={() => importInput.current?.click()}>Import PDF / PPTX</button>
         <button
           onClick={async () => download(await exportDeck(deck), `${safeFilename(deck.name)}.omni`)}
@@ -405,7 +435,7 @@ export default function EditorPage() {
 
       {error && <div className="error">{error}</div>}
 
-      <main className="canvas">
+      <main className={`canvas ${view === '3d' && !isEmpty ? 'canvas-3d' : ''}`}>
         {isEmpty ? (
           <div className="empty-state">
             <h2>No slides yet</h2>
@@ -416,6 +446,15 @@ export default function EditorPage() {
               Import PDF / PPTX
             </button>
           </div>
+        ) : view === '3d' ? (
+          <Grid3D
+            deck={deck}
+            layer={viewLayer}
+            selected={selected}
+            onSelect={(id) => select(id, selPos)}
+            onMove={(from, to) => commit(moveSlide(deck, from, to))}
+            onOpen={(p) => startPresenting(navigate, deck.id, p)}
+          />
         ) : (
           <GridCanvas
             deck={deck}

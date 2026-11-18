@@ -781,3 +781,139 @@ input:focus-visible {
     padding: 16px;
   }
 }
+
+/* Editor: 2D / 3D switch and the 3D view */
+.view-toggle {
+  display: flex;
+}
+.view-toggle button {
+  border-radius: 0;
+  padding: 4px 10px;
+  font-weight: 600;
+}
+.view-toggle button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.view-toggle button:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-left: -1px;
+}
+.view-toggle button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.canvas.canvas-3d {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+}
+.grid3d {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  perspective: 2400px;
+  background: radial-gradient(ellipse at 50% 35%, #1b2033 0%, var(--bg) 75%);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.grid3d.orbiting,
+.grid3d.is-dragging {
+  cursor: grabbing;
+}
+/* No overflow/opacity/filter here: they would flatten the 3D scene. */
+.grid3d-scene {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform-origin: 0 0;
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.grid3d.orbiting .grid3d-scene {
+  transition: none;
+}
+/* One layer: a flat plane holding that layer's grid cells. */
+.plate {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  padding: 0;
+  border-radius: 14px;
+  background: rgb(124 156 255 / 0.04);
+  box-shadow: inset 0 0 0 1px rgb(124 156 255 / 0.16);
+  opacity: 0.75;
+  transition: opacity 0.2s;
+}
+.plate.active {
+  opacity: 1;
+  background: rgb(124 156 255 / 0.07);
+  box-shadow: inset 0 0 0 1px rgb(124 156 255 / 0.35);
+}
+.plate.new {
+  opacity: 1;
+  background: rgb(124 156 255 / 0.03);
+  box-shadow: inset 0 0 0 2px rgb(124 156 255 / 0.35);
+  border: 2px dashed transparent;
+}
+.plate .cell.empty {
+  border-color: rgb(124 156 255 / 0.18);
+}
+.plate .cell.filled {
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 18px 36px rgb(0 0 0 / 0.45);
+}
+.plate .cell.selected {
+  box-shadow:
+    0 0 0 4px var(--accent),
+    0 18px 36px rgb(0 0 0 / 0.45);
+}
+.plate .cell.drop-target {
+  box-shadow: 0 0 0 4px var(--accent);
+}
+.plate .badge {
+  font-size: 16px;
+  padding: 3px 9px;
+}
+.plate-label {
+  position: absolute;
+  left: 4px;
+  top: -64px;
+  font-size: 36px;
+  font-weight: 700;
+  color: rgb(231 233 239 / 0.6);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.grid3d-hud {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+.grid3d-hud > * {
+  pointer-events: auto;
+}
+.grid3d-hud .muted {
+  background: rgb(15 17 23 / 0.7);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.grid3d .drag-ghost {
+  position: absolute;
+}
+@media (prefers-reduced-motion: reduce) {
+  .grid3d-scene {
+    transition-duration: 1ms;
+  }
+}
