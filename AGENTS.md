@@ -61,7 +61,8 @@ src/import/pptxHtml.ts  Pure slide JSON → HTML (in pt). Unit-tested. pptxChart
 src/import/raster.ts  Shared canvas encoding + HTML→image via SVG foreignObject
 src/home/             Deck list
 src/editor/           Grid editor (GridCanvas does pointer-based drag & drop)
-src/present/          Present mode, Minimap, startPresenting() helper
+src/present/          Present mode (cube transitions in styles.css), Overview3D (M),
+                      camera.ts (pure 3D camera math, unit-tested), startPresenting()
 src/ui/               Shared components (SlideImage, ImportProgress)
 src/styles.css        All styles, one global sheet, CSS variables on :root
 e2e/basic.spec.ts     End-to-end flow
@@ -107,6 +108,13 @@ public/_headers       Production security headers (CSP); applied by Cloudflare, 
   scope them to their component class.
 - Routing is hash-based and Vite `base` is `'./'` so `dist/` works on any static host. Reference
   public files via `import.meta.env.BASE_URL`, not `/`.
+- **3D present mode is plain CSS 3D** (no WebGL). Transitions: `.present` has `perspective`,
+  `.scene3d` is `preserve-3d`, stages are cube faces (`--half-w`/`--half-h` deep). Anything that
+  flattens 3D on those ancestors (`overflow` other than visible, `opacity` < 1, `filter`) kills
+  the effect; keep such styles off `.scene3d` and `.ov-scene`.
+- The overview handles Escape/M in a **capture-phase** keydown listener and stops propagation, so
+  it can fly back before closing and Escape doesn't also exit present mode. Keep `FLY_MS` in
+  `Overview3D.tsx` in sync with the `.ov-scene` transition.
 - Fullscreen must be requested inside a user gesture, so go through `startPresenting()` instead of
   navigating to the present route directly.
 - TypeScript is pinned to 5.9 because `typescript-eslint` doesn't support TS 6+/7 yet.

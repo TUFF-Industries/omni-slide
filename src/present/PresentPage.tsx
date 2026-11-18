@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ALL_DIRS, DEPTH_DIRS, DIRS, key, layerCount, neighbor, pos, slideAt } from '../model/grid';
+import {
+  ALL_DIRS,
+  DEPTH_DIRS,
+  DIRS,
+  key,
+  layerCount,
+  neighbor,
+  occupied,
+  pos,
+  samePos,
+  slideAt,
+} from '../model/grid';
 import type { Deck, Dir, Pos } from '../model/types';
 import { assetUrl } from '../storage/assetUrl';
 import { getDeck } from '../storage/db';
 import SlideImage from '../ui/SlideImage';
-import Minimap from './Minimap';
+import Overview3D from './Overview3D';
 
 const KEYS: Record<string, Dir> = {
   ArrowUp: 'up',
@@ -47,7 +58,7 @@ export default function PresentPage() {
   const navigate = useNavigate();
   const [deck, setDeck] = useState<Deck | null | undefined>(undefined);
   const [view, setView] = useState<View | null>(null);
-  const [minimap, setMinimap] = useState(false);
+  const [overview, setOverview] = useState(false);
   const [idle, setIdle] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
 
@@ -94,8 +105,9 @@ export default function PresentPage() {
         move(dir);
       } else if (e.key === 'Home' && deck) {
         go(deck.start, null);
-      } else if (e.key === 'm' || e.key === 'M') {
-        setMinimap((m) => !m);
+      } else if ((e.key === 'm' || e.key === 'M') && deck && occupied(deck).length > 0) {
+        // Closing is handled by the overview itself, so it can fly back first.
+        setOverview(true);
       } else if (e.key === 'f' || e.key === 'F') {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         else document.documentElement.requestFullscreen?.().catch(() => {});
@@ -169,19 +181,22 @@ export default function PresentPage() {
         else move(dy < 0 ? 'down' : 'up');
       }}
     >
-      {previous && view.dir && (
-        <div key={`out-${view.n}`} className={`stage out out-${view.dir}`} aria-hidden>
-          <SlideImage slide={previous} />
+      {/* Slides are faces of a cube: moving turns it, going in/out moves through depth. */}
+      <div className="scene3d">
+        {previous && view.dir && (
+          <div key={`out-${view.n}`} className={`stage out out-${view.dir}`} aria-hidden>
+            <SlideImage slide={previous} />
+          </div>
+        )}
+        <div
+          key={`in-${view.n}`}
+          className={`stage ${view.dir ? `in in-${view.dir}` : ''}`}
+          data-testid="current-slide"
+          data-slide={current?.id}
+          data-source={current?.source}
+        >
+          <SlideImage slide={current} />
         </div>
-      )}
-      <div
-        key={`in-${view.n}`}
-        className={`stage ${view.dir ? `in in-${view.dir}` : ''}`}
-        data-testid="current-slide"
-        data-slide={current?.id}
-        data-source={current?.source}
-      >
-        <SlideImage slide={current} />
       </div>
 
       {[...DIRS, ...DEPTH_DIRS].map((d) =>
@@ -204,15 +219,25 @@ export default function PresentPage() {
       )}
 
       <div className="present-chrome">
-        <button onClick={() => setMinimap((m) => !m)} title="Map (M)">
-          Map
+        <button onClick={() => setOverview(true)} title="3D overview (M)">
+          Overview
         </button>
         <button onClick={exit} title="Exit (Esc)">
           Exit
         </button>
       </div>
 
-      {minimap && <Minimap deck={deck} pos={view.pos} onJump={(p) => go(p, null)} />}
+      {overview && current && (
+        <Overview3D
+          deck={deck}
+          pos={view.pos}
+          onPick={(p) => {
+            setOverview(false);
+            if (!samePos(p, view.pos)) go(p, null);
+          }}
+          onClose={() => setOverview(false)}
+        />
+      )}
     </div>
   );
 }

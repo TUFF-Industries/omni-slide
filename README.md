@@ -19,7 +19,8 @@ Done:
   and push the selected slide in or out with Shift+Z / Shift+X. When presenting, Z dives in and X
   comes back out.
 - Undo/redo every edit in the editor (⌘Z / ⌘⇧Z, or Ctrl+Z / Ctrl+Y), including deleted slides.
-- Present mode: arrow keys (plus PageUp/PageDown/Space for clickers), Z / X for layers, swipe on touch, `M` for a minimap, `F` fullscreen, `Home` back to start, `Esc` to exit.
+- Present mode in 3D: slides turn like faces of a cube as you move, and dive through depth for
+  layers. Arrow keys (plus PageUp/PageDown/Space for clickers), Z / X for layers, swipe on touch, `M` to fly out to a 3D overview of the whole deck (drag to look around, click a slide to fly to it), `F` fullscreen, `Home` back to start, `Esc` to exit.
 - Everything is stored locally in the browser (IndexedDB). Decks can be exported/imported as `.omni` files (a zip of `deck.json` + images).
 
 Planned: a native slide editor.

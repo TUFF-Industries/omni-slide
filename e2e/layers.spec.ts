@@ -65,7 +65,70 @@ test('layers: put a slide behind another, then dive in and out while presenting'
   await page.getByRole('button', { name: 'Go in' }).click();
   await expect(current(page)).toHaveAttribute('data-source', 'deep.pdf p2');
 
+  // M flies out to the 3D overview of every layer; clicking a slide flies into it.
+  await page.keyboard.press('x');
+  await expect(current(page)).toHaveAttribute('data-source', 'deep.pdf p1');
+  await page.keyboard.press('m');
+  await expect(page.getByTestId('overview')).toBeVisible();
+  await expect(page.locator('.ov-tile')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Go to slide at column 1, row 1, layer 2' }).click();
+  await expect(page.getByTestId('overview')).toBeHidden();
+  await expect(current(page)).toHaveAttribute('data-source', 'deep.pdf p2');
+  // Esc closes the overview but stays in present mode.
+  await page.keyboard.press('m');
+  await expect(page.getByTestId('overview')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('overview')).toBeHidden();
+  await expect(current(page)).toHaveAttribute('data-source', 'deep.pdf p2');
+
   // The layer survives a reload (it's in the URL) and the deck in storage.
   await page.reload();
   await expect(current(page)).toHaveAttribute('data-source', 'deep.pdf p2');
+});
+
+test('deleting the only slide on the last layer goes back to a real layer', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('home-import-input').setInputFiles({
+    name: 'two.pdf',
+    mimeType: 'application/pdf',
+    buffer: await makePdf(2),
+  });
+  await expect(page.locator('.cell.filled')).toHaveCount(2);
+  await cell(page, 1, 0).click();
+  await page.keyboard.press('Shift+Z');
+  await expect(page.getByTestId('grid')).toHaveAttribute('data-layer', '1');
+  await page.keyboard.press('Delete');
+  await expect(page.getByTestId('grid')).toHaveAttribute('data-layer', '0');
+  await expect(page.locator('.cell.filled')).toHaveCount(1);
+  await expect(page.getByRole('tab')).toHaveCount(1);
+});
+
+test('3D overview: dragging turns the camera without picking a slide', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('home-import-input').setInputFiles({
+    name: 'three.pdf',
+    mimeType: 'application/pdf',
+    buffer: await makePdf(3),
+  });
+  await expect(page.locator('.cell.filled')).toHaveCount(3);
+  await page.getByRole('button', { name: '▶ Present' }).click();
+  await expect(current(page)).toHaveAttribute('data-source', 'three.pdf p1');
+  await page.getByRole('button', { name: 'Overview' }).click();
+  const scene = page.locator('.ov-scene');
+  await expect(page.getByTestId('overview')).toBeVisible();
+  // Let the fly-out finish, then drag starting on a slide.
+  await page.waitForTimeout(800);
+  const before = await scene.evaluate((el) => el.style.transform);
+  const tile = (await page.getByRole('button', { name: /column 2, row 1/ }).boundingBox())!;
+  await page.mouse.move(tile.x + tile.width / 2, tile.y + tile.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tile.x + tile.width / 2 + 150, tile.y + tile.height / 2 + 40, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await expect(page.getByTestId('overview')).toBeVisible(); // the drag didn't pick slide 2
+  expect(await scene.evaluate((el) => el.style.transform)).not.toBe(before);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('overview')).toBeHidden();
+  await expect(current(page)).toHaveAttribute('data-source', 'three.pdf p1');
 });

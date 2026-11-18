@@ -427,115 +427,163 @@ input:focus-visible {
 .present.idle {
   cursor: none;
 }
+/*
+ * 3D: the slides are faces of a cube half a screen deep. Moving sideways turns it about the
+ * vertical axis, up/down about the horizontal one; in/out moves through depth.
+ */
+.present {
+  --half-w: 50vw;
+  --half-h: 50vh;
+  --cube-ms: 560ms;
+  --depth-ms: 460ms;
+  perspective: 1800px;
+}
+.scene3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
 .stage {
   position: absolute;
   inset: 0;
+  backface-visibility: hidden;
 }
-.stage.in {
-  animation: 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
+.stage.in,
 .stage.out {
-  animation: 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: var(--cube-ms) cubic-bezier(0.45, 0.05, 0.25, 1) both;
+  will-change: transform;
 }
 .stage.in-right {
-  animation-name: from-right;
-}
-.stage.in-left {
-  animation-name: from-left;
-}
-.stage.in-down {
-  animation-name: from-bottom;
-}
-.stage.in-up {
-  animation-name: from-top;
+  animation-name: cube-in-right;
 }
 .stage.out-right {
-  animation-name: to-left;
+  animation-name: cube-out-right;
+}
+.stage.in-left {
+  animation-name: cube-in-left;
 }
 .stage.out-left {
-  animation-name: to-right;
+  animation-name: cube-out-left;
+}
+.stage.in-down {
+  animation-name: cube-in-down;
 }
 .stage.out-down {
-  animation-name: to-top;
+  animation-name: cube-out-down;
+}
+.stage.in-up {
+  animation-name: cube-in-up;
 }
 .stage.out-up {
-  animation-name: to-bottom;
+  animation-name: cube-out-up;
 }
-/* Going in: the current slide rushes past, the deeper one comes up from behind. */
+/* Turning about the cube's centre, which sits half a screen behind the slide. */
+@keyframes cube-in-right {
+  from {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(90deg) translateZ(var(--half-w));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(0deg) translateZ(var(--half-w));
+  }
+}
+@keyframes cube-out-right {
+  from {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(0deg) translateZ(var(--half-w));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(-90deg) translateZ(var(--half-w));
+  }
+}
+@keyframes cube-in-left {
+  from {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(-90deg) translateZ(var(--half-w));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(0deg) translateZ(var(--half-w));
+  }
+}
+@keyframes cube-out-left {
+  from {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(0deg) translateZ(var(--half-w));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-w))) rotateY(90deg) translateZ(var(--half-w));
+  }
+}
+@keyframes cube-in-down {
+  from {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(-90deg) translateZ(var(--half-h));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(0deg) translateZ(var(--half-h));
+  }
+}
+@keyframes cube-out-down {
+  from {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(0deg) translateZ(var(--half-h));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(90deg) translateZ(var(--half-h));
+  }
+}
+@keyframes cube-in-up {
+  from {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(90deg) translateZ(var(--half-h));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(0deg) translateZ(var(--half-h));
+  }
+}
+@keyframes cube-out-up {
+  from {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(0deg) translateZ(var(--half-h));
+  }
+  to {
+    transform: translateZ(calc(-1 * var(--half-h))) rotateX(-90deg) translateZ(var(--half-h));
+  }
+}
+/* Going in: the current slide flies past the camera, the deeper one comes up from behind. */
+.stage.in-in,
+.stage.out-in,
+.stage.in-out,
+.stage.out-out {
+  animation-duration: var(--depth-ms);
+  animation-timing-function: cubic-bezier(0.3, 0.6, 0.2, 1);
+}
 .stage.in-in {
-  animation-name: from-behind;
+  animation-name: depth-from-behind;
 }
 .stage.out-in {
-  animation-name: to-front;
+  animation-name: depth-past-camera;
 }
 .stage.in-out {
-  animation-name: from-front;
+  animation-name: depth-from-camera;
 }
 .stage.out-out {
-  animation-name: to-behind;
+  animation-name: depth-to-behind;
 }
-@keyframes from-behind {
+@keyframes depth-from-behind {
   from {
-    transform: scale(0.6);
+    transform: translateZ(-1400px);
     opacity: 0;
   }
 }
-@keyframes to-front {
+@keyframes depth-past-camera {
   to {
-    transform: scale(1.6);
+    transform: translateZ(700px);
     opacity: 0;
   }
 }
-@keyframes from-front {
+@keyframes depth-from-camera {
   from {
-    transform: scale(1.6);
+    transform: translateZ(700px);
     opacity: 0;
   }
 }
-@keyframes to-behind {
+@keyframes depth-to-behind {
   to {
-    transform: scale(0.6);
+    transform: translateZ(-1400px);
     opacity: 0;
-  }
-}
-@keyframes from-right {
-  from {
-    transform: translateX(100%);
-  }
-}
-@keyframes from-left {
-  from {
-    transform: translateX(-100%);
-  }
-}
-@keyframes from-bottom {
-  from {
-    transform: translateY(100%);
-  }
-}
-@keyframes from-top {
-  from {
-    transform: translateY(-100%);
-  }
-}
-@keyframes to-left {
-  to {
-    transform: translateX(-100%);
-  }
-}
-@keyframes to-right {
-  to {
-    transform: translateX(100%);
-  }
-}
-@keyframes to-top {
-  to {
-    transform: translateY(-100%);
-  }
-}
-@keyframes to-bottom {
-  to {
-    transform: translateY(100%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -625,33 +673,93 @@ input:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
-.minimap {
+/* 3D overview (M) */
+.overview {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  perspective: 2200px;
+  background: radial-gradient(ellipse at 50% 40%, #1b2033 0%, #07080c 70%);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.overview.dragging {
+  cursor: grabbing;
+}
+.ov-scene {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-  background: rgb(15 17 23 / 0.85);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
-  overflow: auto;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform-origin: 0 0;
+  /* Keep in sync with FLY_MS in Overview3D.tsx. */
+  transition: transform 650ms cubic-bezier(0.45, 0.05, 0.25, 1);
 }
-.mm-cell {
-  width: 18px;
-  height: 11px;
+.overview.dragging .ov-scene {
+  transition: none;
+}
+.ov-tile {
+  position: absolute;
+  left: 0;
+  top: 0;
   padding: 0;
-  border-radius: 2px;
-  background: #4a5066;
   border: none;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.14),
+    0 24px 48px rgb(0 0 0 / 0.55);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
 }
-.mm-cell.empty {
-  background: transparent;
+.ov-tile:hover,
+.ov-tile:focus-visible {
+  border: none;
+  box-shadow:
+    0 0 0 3px rgb(124 156 255 / 0.7),
+    0 24px 48px rgb(0 0 0 / 0.55);
 }
-.mm-cell.current {
-  background: var(--accent);
+.overview.many .ov-tile {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14);
+}
+.ov-tile.current {
+  box-shadow:
+    0 0 0 4px var(--accent),
+    0 0 48px rgb(124 156 255 / 0.45);
+}
+.ov-layer-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgb(231 233 239 / 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.ov-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--muted);
+  background: rgb(15 17 23 / 0.7);
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-scene {
+    transition-duration: 1ms;
+  }
 }
 
 @media (max-width: 640px) {
