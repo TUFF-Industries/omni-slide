@@ -6,8 +6,9 @@ repo, so keep changes focused and go through PRs.
 ## What this is
 
 A static web app (to be hosted at omni.salken.dev) for presentations navigable in four directions.
-Slides sit on a 2D grid: in present mode ← → move along a row, ↑ ↓ move along a column. Moving
-toward an empty cell does nothing.
+Slides sit on a grid: in present mode ← → move along a row, ↑ ↓ move along a column, and Z / X
+move in and out of **layers** (slides sitting behind other slides at the same column and row).
+Moving toward an empty cell does nothing.
 
 Roadmap:
 
@@ -70,7 +71,7 @@ public/_headers       Production security headers (CSP); applied by Cloudflare, 
 
 ## Data model rules
 
-- `Deck.cells` maps `"x,y"` → slide id; `Deck.slides` maps id → `Slide`. Image bytes are **not** in
+- Positions are `{ x, y, z }`: column, row, layer (0 = front). `Deck.cells` maps `"x,y,z"` → slide id; `Deck.slides` maps id → `Slide`. Image bytes are **not** in
   the deck, they're in the `assets` store keyed by `slide.assetId`.
 - Grid functions are pure and return a new Deck. Mutating functions call `normalize()`, which
   shifts coordinates so the top-left occupied cell is (0,0) and keeps `start` on a real slide.
@@ -79,7 +80,14 @@ public/_headers       Production security headers (CSP); applied by Cloudflare, 
 - `Slide` is a union on `kind` (currently only `'image'`). Add new slide types (PPTX, native) as new
   union members rather than changing `image`. Anything that renders slides (`SlideImage`, present
   mode, thumbnails) must handle every kind.
-- `.omni` has a `version` field (currently 1). Changing the deck shape in an incompatible way means
+- Rows and columns are shared by all layers: `normalize()` measures the x/y shift across every
+  layer and drops empty layers (so `in`/`out` can always reach the next layer). `insertRow` /
+  `insertColumn` apply to all layers. In the editor the grid shows one layer (`data-layer`);
+  `data-cell` stays `"x,y"` within it.
+- Decks saved before layers (`"x,y"` keys, `start` without z) are migrated by `migrateDeck()` when
+  read from IndexedDB or a `.omni` file. Anything that reads decks from storage must go through
+  `getDeck`/`listDecks`/`importDeckFile`, not the raw store.
+- `.omni` has a `version` field (currently 2; 1 = before layers). Changing the deck shape in an incompatible way means
   bumping it and migrating older files in `importDeckFile`. IndexedDB schema changes go through the
   `openDB` upgrade callback with a version bump.
 - Deleting a slide must also delete its asset. In the editor this is automatic: every deck change

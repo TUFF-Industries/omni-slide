@@ -6,6 +6,6 @@ import type { Pos } from '../model/types';
  */
 export function startPresenting(navigate: NavigateFunction, deckId: string, at?: Pos): void {
   document.documentElement.requestFullscreen?.().catch(() => {});
-  const q = at ? `?x=${at.x}&y=${at.y}` : '';
+  const q = at ? `?x=${at.x}&y=${at.y}&z=${at.z}` : '';
   navigate(`/deck/${deckId}/present${q}`);
 }

@@ -24,7 +24,7 @@ function deck(...ids: string[]): Deck {
     updatedAt: 0,
     slides,
     cells: {},
-    start: { x: 0, y: 0 },
+    start: { x: 0, y: 0, z: 0 },
   };
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { DIRS, key, neighbor, slideAt } from '../model/grid';
+import { ALL_DIRS, DEPTH_DIRS, DIRS, key, layerCount, neighbor, pos, slideAt } from '../model/grid';
 import type { Deck, Dir, Pos } from '../model/types';
 import { assetUrl } from '../storage/assetUrl';
 import { getDeck } from '../storage/db';
@@ -16,9 +16,21 @@ const KEYS: Record<string, Dir> = {
   PageDown: 'right',
   PageUp: 'left',
   ' ': 'right',
+  // Layers: Z dives in (one layer deeper), X comes back out.
+  z: 'in',
+  Z: 'in',
+  x: 'out',
+  X: 'out',
 };
 
-const CHEVRON: Record<Dir, string> = { up: '⌃', down: '⌄', left: '‹', right: '›' };
+const CHEVRON: Record<Dir, string> = {
+  up: '⌃',
+  down: '⌄',
+  left: '‹',
+  right: '›',
+  in: '⤓ In',
+  out: '⤒ Out',
+};
 const SWIPE_PX = 50;
 const IDLE_MS = 2500;
 
@@ -43,7 +55,7 @@ export default function PresentPage() {
     getDeck(id!).then((d) => {
       setDeck(d ?? null);
       if (!d) return;
-      const q = { x: Number(params.get('x')), y: Number(params.get('y')) };
+      const q = pos(Number(params.get('x')), Number(params.get('y')), Number(params.get('z')));
       const start = params.has('x') && d.cells[key(q)] ? q : d.start;
       setView({ pos: start, prev: null, dir: null, n: 0 });
     });
@@ -54,7 +66,7 @@ export default function PresentPage() {
   const go = useCallback(
     (to: Pos, dir: Dir | null) => {
       setView((v) => (v ? { pos: to, prev: v.pos, dir, n: v.n + 1 } : v));
-      setParams({ x: String(to.x), y: String(to.y) }, { replace: true });
+      setParams({ x: String(to.x), y: String(to.y), z: String(to.z) }, { replace: true });
     },
     [setParams],
   );
@@ -95,10 +107,10 @@ export default function PresentPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [move, go, exit, deck]);
 
-  // Preload the four neighbours so moving is instant.
+  // Preload the neighbours (including in/out) so moving is instant.
   useEffect(() => {
     if (!deck || !view) return;
-    for (const d of DIRS) {
+    for (const d of ALL_DIRS) {
       const n = neighbor(deck, view.pos, d);
       const s = n && slideAt(deck, n);
       if (s)
@@ -132,6 +144,7 @@ export default function PresentPage() {
     );
 
   const current = slideAt(deck, view.pos);
+  const layers = layerCount(deck);
   const previous = view.prev ? slideAt(deck, view.prev) : undefined;
 
   return (
@@ -171,7 +184,7 @@ export default function PresentPage() {
         <SlideImage slide={current} />
       </div>
 
-      {DIRS.map((d) =>
+      {[...DIRS, ...DEPTH_DIRS].map((d) =>
         neighbor(deck, view.pos, d) ? (
           <button
             key={d}
@@ -182,6 +195,12 @@ export default function PresentPage() {
             {CHEVRON[d]}
           </button>
         ) : null,
+      )}
+
+      {layers > 1 && (
+        <div className="layer-pill" data-testid="layer-pill">
+          Layer {view.pos.z + 1} of {layers}
+        </div>
       )}
 
       <div className="present-chrome">
