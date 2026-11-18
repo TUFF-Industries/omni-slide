@@ -164,7 +164,7 @@ export default function GridCanvas({ deck, cellWidth, selected, onSelect, onMove
             transform: `translate(${drag.x - cellWidth / 2}px, ${drag.y - cellHeight / 2}px)`,
           }}
         >
-          <SlideImage slide={dragSlide} />
+          <SlideImage slide={dragSlide} size="thumb" />
         </div>
       )}
     </div>

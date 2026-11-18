@@ -106,6 +106,8 @@ export default function EditorPage() {
   );
 
   const busy = progress !== null;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
   const undoLast = useCallback(() => {
     if (historyRef.current && !busy) update(undo(historyRef.current));
   }, [update, busy]);
@@ -128,7 +130,9 @@ export default function EditorPage() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const d = historyRef.current?.present;
-      if (!d) return;
+      // While importing, the import saves the deck itself as it goes; an edit made now would be
+      // overwritten by its next save.
+      if (!d || busyRef.current) return;
       const target = e.target as HTMLElement;
       const k = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (k === 'z' || k === 'y')) {
@@ -169,18 +173,18 @@ export default function EditorPage() {
     const h = historyRef.current;
     if (!h || files.length === 0) return;
     setError(null);
+    // importFiles saves the deck itself as slides arrive; show each save, and undo the whole
+    // import as one step (same tag).
+    const tag = `import:${Date.now()}`;
+    const show = (d: Deck) => update(record(historyRef.current ?? h, d, tag), false);
     try {
-      const next = await importFiles(h.present, files, setProgress);
-      // importFiles saves the deck itself, after each file.
-      if (next !== h.present) update(record(historyRef.current ?? h, next), false);
+      show(await importFiles(h.present, files, { onProgress: setProgress, onSaved: show }));
     } catch (e) {
       setError(`Could not import: ${(e as Error).message}`);
-      // importFiles saves after each file, so files before the failing one may already be in the
-      // stored deck. Pick that up, or the next edit would save over it.
+      // Whatever was imported before the failure is already saved; pick up the latest copy so the
+      // next edit doesn't save over it.
       const saved = await getDeck(h.present.id);
-      if (saved && saved.updatedAt !== h.present.updatedAt) {
-        update(record(historyRef.current ?? h, saved), false);
-      }
+      if (saved && saved.updatedAt !== historyRef.current?.present.updatedAt) show(saved);
     } finally {
       setProgress(null);
     }
