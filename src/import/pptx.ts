@@ -1,9 +1,8 @@
 import { parse } from 'pptxtojson';
-import type { Slide } from '../model/types';
-import { deleteAsset, newId, putAsset } from '../storage/db';
-import type { Progress } from './index';
+import { newId, putAsset } from '../storage/db';
+import type { Progress, SlideSink } from './index';
 import { esc, slideToHtml, type SlideSize } from './pptxHtml';
-import { rasterizeXhtml, TARGET_PX } from './raster';
+import { MAX_FAILURES_IN_A_ROW, rasterizeXhtml, TARGET_PX } from './raster';
 
 /** CSS pixels per point. */
 const PX_PER_PT = 96 / 72;
@@ -33,8 +32,15 @@ function failedSlideHtml(size: SlideSize, n: number): string {
   );
 }
 
-/** Render every slide of a .pptx to an image, store it, and return the new slides in order. */
-export async function importPptx(file: File, onProgress?: (p: Progress) => void): Promise<Slide[]> {
+/**
+ * Render every slide of a .pptx to an image and store it, handing each new slide to `onSlide` in
+ * order as soon as it's stored. A slide that fails to render becomes a placeholder slide.
+ */
+export async function importPptx(
+  file: File,
+  onSlide: SlideSink,
+  onProgress?: (p: Progress) => void,
+): Promise<void> {
   onProgress?.({ file: file.name, page: 0, pages: 0, unit: 'Slide' });
   let parsed: Awaited<ReturnType<typeof parse>>;
   try {
@@ -56,33 +62,36 @@ export async function importPptx(file: File, onProgress?: (p: Progress) => void)
   const pxH = Math.round(cssH * scale);
   const render = (html: string) => rasterizeXhtml(toXhtml(html), cssW, pxW, pxH);
 
-  const slides: Slide[] = [];
-  try {
-    for (let i = 0; i < pptSlides.length; i++) {
-      onProgress?.({ file: file.name, page: i + 1, pages: pptSlides.length, unit: 'Slide' });
-      let blob: Blob;
-      let failed = false;
-      try {
-        blob = await render(slideToHtml(pptSlides[i], size));
-      } catch {
-        failed = true;
-        blob = await render(failedSlideHtml(size, i + 1));
+  let failuresInARow = 0;
+  for (let i = 0; i < pptSlides.length; i++) {
+    onProgress?.({ file: file.name, page: i + 1, pages: pptSlides.length, unit: 'Slide' });
+    let blob: Blob;
+    let failed = false;
+    try {
+      blob = await render(slideToHtml(pptSlides[i], size));
+      failuresInARow = 0;
+    } catch (e) {
+      if (++failuresInARow >= MAX_FAILURES_IN_A_ROW) {
+        const why = e instanceof Error ? e.message : String(e);
+        throw new Error(
+          `Slides ${i + 2 - failuresInARow}–${i + 1} of ${file.name} failed: ${why}`,
+          {
+            cause: e,
+          },
+        );
       }
-      const assetId = newId();
-      await putAsset(assetId, blob);
-      slides.push({
-        id: newId(),
-        kind: 'image',
-        assetId,
-        width: pxW,
-        height: pxH,
-        source: `${file.name} s${i + 1}${failed ? ' (not imported)' : ''}`,
-      });
+      failed = true;
+      blob = await render(failedSlideHtml(size, i + 1));
     }
-  } catch (e) {
-    // Nothing references these images yet, so don't leave them behind in IndexedDB.
-    await Promise.allSettled(slides.map((s) => deleteAsset(s.assetId)));
-    throw e;
+    const assetId = newId();
+    await putAsset(assetId, blob);
+    await onSlide({
+      id: newId(),
+      kind: 'image',
+      assetId,
+      width: pxW,
+      height: pxH,
+      source: `${file.name} s${i + 1}${failed ? ' (not imported)' : ''}`,
+    });
   }
-  return slides;
 }

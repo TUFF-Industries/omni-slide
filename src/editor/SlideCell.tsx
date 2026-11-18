@@ -42,7 +42,7 @@ export default function SlideCell({
     >
       {slide && (
         <>
-          <SlideImage slide={slide} />
+          <SlideImage slide={slide} size="thumb" />
           {isStart && <span className="badge start-badge">Start</span>}
           {DIRS.map((d) => neighbor(deck, pos, d) && <span key={d} className={`link link-${d}`} />)}
         </>

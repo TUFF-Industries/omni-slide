@@ -48,10 +48,12 @@ src/model/grid.ts     Pure grid logic: neighbor, moveSlide (swaps), insertRow/Co
                       removeSlide, appendRow, normalize, setStart, posOf. Unit-tested.
 src/model/history.ts  Generic pure undo/redo stack (record/undo/redo, tag-based merging). Unit-tested.
 src/storage/db.ts     IndexedDB: `decks` store (Deck JSON) and `assets` store (image Blobs)
-src/storage/assetUrl.ts  Cached object URLs for assets + useAssetUrl hook
+src/storage/assetUrl.ts  Cached object URLs for assets + useAssetUrl hook; 'thumb' size = 640px
+                      in-memory copies for grids/lists
 src/storage/assetTrash.ts  syncAssets(prev, next): deletes/restores assets as slides leave/return
 src/storage/file.ts   .omni export/import (zip: deck.json + assets/<assetId>)
-src/import/index.ts   importFiles(): one new row per PDF/PPTX; lazy-loads pdf.ts / pptx.ts
+src/import/index.ts   importFiles(): one new row per PDF/PPTX; lazy-loads pdf.ts / pptx.ts.
+                      Importers stream slides via onSlide; the deck is saved every SAVE_EVERY.
 src/import/pdf.ts     pdf.js renders pages to WebP/PNG (~1920px long edge)
 src/import/pptx.ts    pptxtojson parses slides; each is laid out as HTML and rasterized
 src/import/pptxHtml.ts  Pure slide JSON → HTML (in pt). Unit-tested. pptxChart.ts draws charts.
@@ -105,6 +107,14 @@ public/_headers       Production security headers (CSP); applied by Cloudflare, 
   with Chrome, point `PW_CHROMIUM_PATH` at `Google Chrome.app/Contents/MacOS/Google Chrome` to run
   e2e without downloading a browser.
 - Each Playwright browser context has its own IndexedDB, so tests don't share decks.
+- **Big decks (hundreds of slides) and phones:** show slides in grids/lists with
+  `<SlideImage size="thumb">`; full-size images (1920px) are for present mode only, or a phone
+  tab runs out of memory decoding them. When rendering to a canvas, reuse it or call
+  `releaseCanvas()` (iOS caps total canvas memory). Safari can't encode WebP, so `canvasToBlob`
+  falls back to JPEG (not PNG, which is ~10× bigger).
+- Importers must not hold a whole file's slides until the end: hand each to `onSlide` so
+  `importFiles` can save progress, and so a failure keeps what was done (its images are then
+  referenced by the saved deck, not orphaned).
 - **PPTX rendering** draws HTML through an SVG `<foreignObject>` image. That sandbox can't load
   anything external, so every image in the markup must be a data URL (pptxtojson's
   `imageMode: 'base64'`), and markup must be XHTML (see `toXhtml` in `pptx.ts`). Only fonts

@@ -47,11 +47,27 @@ export function checkUnsupported(files: File[]): void {
   }
 }
 
-/** Import each PDF/PPTX as its own new row at the bottom of the deck, saving after every file. */
+/** Receives each imported slide, in order, right after its image is stored. */
+export type SlideSink = (slide: Slide) => void | Promise<void>;
+
+/** How many new slides to collect between saves while a file imports. */
+export const SAVE_EVERY = 10;
+
+export interface ImportOptions {
+  onProgress?: (p: Progress) => void;
+  /** Called with the deck each time it's saved during the import, so the UI can show slides early. */
+  onSaved?: (deck: Deck) => void;
+}
+
+/**
+ * Import each PDF/PPTX as its own new row at the bottom of the deck. The deck is saved every
+ * SAVE_EVERY slides, so a big file shows up as it imports, and if the import fails (or the tab is
+ * closed) the slides done so far are kept rather than lost with their stored images.
+ */
 export async function importFiles(
   deck: Deck,
   files: File[],
-  onProgress?: (p: Progress) => void,
+  { onProgress, onSaved }: ImportOptions = {},
 ): Promise<Deck> {
   const usable = files.filter(isImportable);
   if (usable.length === 0) {
@@ -59,16 +75,37 @@ export async function importFiles(
     return deck;
   }
   for (const f of usable) {
-    // The PDF and PPTX renderers are large; only load the one a file actually needs.
-    let slides: Slide[];
-    if (isPptx(f)) {
-      const { importPptx } = await import('./pptx');
-      slides = await importPptx(f, onProgress);
-    } else {
-      const { importPdf } = await import('./pdf');
-      slides = await importPdf(f, onProgress);
+    const base = deck;
+    const row: Slide[] = [];
+    let saved = 0;
+    const save = async () => {
+      if (row.length === saved) return;
+      saved = row.length;
+      deck = await saveDeck(appendRow(base, row));
+      onSaved?.(deck);
+    };
+    const onSlide: SlideSink = async (slide) => {
+      row.push(slide);
+      if (row.length - saved >= SAVE_EVERY) await save();
+    };
+    try {
+      // The PDF and PPTX renderers are large; only load the one a file actually needs.
+      if (isPptx(f)) {
+        const { importPptx } = await import('./pptx');
+        await importPptx(f, onSlide, onProgress);
+      } else {
+        const { importPdf } = await import('./pdf');
+        await importPdf(f, onSlide, onProgress);
+      }
+    } catch (e) {
+      // Keep what was imported. If even that save fails (e.g. storage full), report the original
+      // error, which is the one that explains what happened.
+      await save().catch(() => {});
+      const msg = e instanceof Error ? e.message : String(e);
+      const kept = row.length > 0 ? ` (kept the first ${row.length} from ${f.name})` : '';
+      throw new Error(msg + kept, { cause: e });
     }
-    if (slides.length > 0) deck = await saveDeck(appendRow(deck, slides));
+    await save();
   }
   return deck;
 }

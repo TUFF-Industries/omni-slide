@@ -50,7 +50,7 @@ export default function HomePage() {
     }
     let d = await createDeck(baseName(usable[0].name));
     try {
-      d = await importFiles(d, files, setProgress);
+      d = await importFiles(d, files, { onProgress: setProgress });
       navigate(`/deck/${d.id}`);
     } catch (e) {
       setError(`Could not import: ${(e as Error).message}`);
@@ -160,7 +160,7 @@ export default function HomePage() {
           {decks?.map((d) => (
             <li key={d.id} className="deck-card">
               <Link to={`/deck/${d.id}`} className="deck-thumb" aria-label={`Open ${d.name}`}>
-                <SlideImage slide={slideAt(d, d.start)} />
+                <SlideImage slide={slideAt(d, d.start)} size="thumb" />
               </Link>
               <div className="deck-meta">
                 <Link to={`/deck/${d.id}`} className="deck-name">
