@@ -13,12 +13,17 @@ export interface ImageSlide {
 // Future slide kinds (pptx, native editor) get added to this union.
 export type Slide = ImageSlide;
 
+/**
+ * A cell in the deck: `x` is the column, `y` the row, `z` the layer (0 = front; higher numbers sit
+ * behind, at the same x/y). Moving "in" goes one layer deeper, "out" one layer closer.
+ */
 export interface Pos {
   x: number;
   y: number;
+  z: number;
 }
 
-export type CellKey = `${number},${number}`;
+export type CellKey = `${number},${number},${number}`;
 
 export interface Deck {
   id: string;
@@ -30,4 +35,4 @@ export interface Deck {
   start: Pos;
 }
 
-export type Dir = 'up' | 'down' | 'left' | 'right';
+export type Dir = 'up' | 'down' | 'left' | 'right' | 'in' | 'out';

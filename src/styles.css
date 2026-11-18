@@ -363,6 +363,43 @@ input:focus-visible {
   height: 7px;
   width: 4px;
 }
+/* Layers (depth) in the editor */
+.layer-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+.layer-tabs button {
+  min-width: 30px;
+  padding: 3px 8px;
+}
+.layer-tabs button[aria-selected='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.layer-tabs button.new-layer {
+  border-style: dashed;
+}
+.depth-badge {
+  left: auto;
+  right: 6px;
+  background: rgb(15 17 23 / 0.8);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+/* The slide one layer in front, faint, so it's clear what an empty cell sits behind. */
+.cell-ghost {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  filter: grayscale(1);
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
 .drag-ghost {
   position: fixed;
   top: 0;
@@ -423,6 +460,43 @@ input:focus-visible {
 }
 .stage.out-up {
   animation-name: to-bottom;
+}
+/* Going in: the current slide rushes past, the deeper one comes up from behind. */
+.stage.in-in {
+  animation-name: from-behind;
+}
+.stage.out-in {
+  animation-name: to-front;
+}
+.stage.in-out {
+  animation-name: from-front;
+}
+.stage.out-out {
+  animation-name: to-behind;
+}
+@keyframes from-behind {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+@keyframes to-front {
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@keyframes from-front {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@keyframes to-behind {
+  to {
+    transform: scale(0.6);
+    opacity: 0;
+  }
 }
 @keyframes from-right {
   from {
@@ -508,6 +582,33 @@ input:focus-visible {
   bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
+}
+.chevron-in,
+.chevron-out {
+  right: 8px;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.chevron-in {
+  bottom: 8px;
+}
+.chevron-out {
+  bottom: 46px;
+}
+.layer-pill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(20 20 25 / 0.7);
+  color: #fff;
+  transition: opacity 0.2s;
+}
+.present.idle .layer-pill {
+  opacity: 0;
 }
 .present-chrome {
   position: absolute;

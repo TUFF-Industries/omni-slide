@@ -57,6 +57,8 @@ export interface ImportOptions {
   onProgress?: (p: Progress) => void;
   /** Called with the deck each time it's saved during the import, so the UI can show slides early. */
   onSaved?: (deck: Deck) => void;
+  /** Layer (z) the new rows go on. Defaults to the front layer. */
+  layer?: number;
 }
 
 /**
@@ -67,7 +69,7 @@ export interface ImportOptions {
 export async function importFiles(
   deck: Deck,
   files: File[],
-  { onProgress, onSaved }: ImportOptions = {},
+  { onProgress, onSaved, layer = 0 }: ImportOptions = {},
 ): Promise<Deck> {
   const usable = files.filter(isImportable);
   if (usable.length === 0) {
@@ -81,7 +83,7 @@ export async function importFiles(
     const save = async () => {
       if (row.length === saved) return;
       saved = row.length;
-      deck = await saveDeck(appendRow(base, row));
+      deck = await saveDeck(appendRow(base, row, layer));
       onSaved?.(deck);
     };
     const onSlide: SlideSink = async (slide) => {

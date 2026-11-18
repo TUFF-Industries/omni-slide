@@ -1,10 +1,11 @@
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
-import { normalize } from '../model/grid';
+import { migrateDeck, normalize } from '../model/grid';
 import type { Deck, Slide } from '../model/types';
 import { getAsset, newId, putAsset, saveDeck } from './db';
 
 const FORMAT = 'omni-slide';
-const VERSION = 1;
+// 2: layers. Cells are keyed "x,y,z" and positions have z. Version 1 files load on layer 0.
+const VERSION = 2;
 
 /** Bundle a deck and its images into a `.omni` zip. */
 export async function exportDeck(deck: Deck): Promise<Blob> {
@@ -28,7 +29,7 @@ export async function importDeckFile(file: Blob): Promise<Deck> {
   const parsed = JSON.parse(strFromU8(manifest));
   if (parsed.format !== FORMAT) throw new Error('Not an Omni Slide file');
   if (parsed.version > VERSION) throw new Error('File was made by a newer version of Omni Slide');
-  const src: Deck = parsed.deck;
+  const src: Deck = migrateDeck(parsed.deck);
 
   const slides: Record<string, Slide> = {};
   for (const s of Object.values(src.slides)) {

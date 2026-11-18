@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { migrateDeck } from '../model/grid';
 import type { Deck } from '../model/types';
 
 interface OmniDB extends DBSchema {
@@ -23,12 +24,14 @@ export function newId(): string {
 }
 
 export async function listDecks(): Promise<Deck[]> {
-  const decks = await (await db()).getAll('decks');
+  // Decks are migrated as they're read (see migrateDeck), so stored decks of any age work.
+  const decks = (await (await db()).getAll('decks')).map(migrateDeck);
   return decks.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function getDeck(id: string): Promise<Deck | undefined> {
-  return (await db()).get('decks', id);
+  const d = await (await db()).get('decks', id);
+  return d && migrateDeck(d);
 }
 
 export async function saveDeck(deck: Deck): Promise<Deck> {
@@ -46,7 +49,7 @@ export async function createDeck(name: string): Promise<Deck> {
     updatedAt: now,
     slides: {},
     cells: {},
-    start: { x: 0, y: 0 },
+    start: { x: 0, y: 0, z: 0 },
   };
   await (await db()).put('decks', deck);
   return deck;

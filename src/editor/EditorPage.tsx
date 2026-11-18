@@ -4,6 +4,8 @@ import { filesFromDrop, hasFiles, IMPORT_ACCEPT, importFiles, type Progress } fr
 import {
   insertColumn,
   insertRow,
+  key,
+  layerCount,
   moveSlide,
   neighbor,
   posOf,
@@ -37,6 +39,8 @@ const ARROWS: Record<string, Dir> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
 };
+/** Same keys as present mode: Z goes in (a layer deeper), X comes back out. */
+const DEPTH_KEYS: Record<string, Dir> = { z: 'in', x: 'out' };
 
 const ZOOM_KEY = 'omni.cellWidth';
 
@@ -56,6 +60,8 @@ export default function EditorPage() {
   // The deck being edited is always history.present; every change goes through update().
   const [history, setHistory] = useState<History<Deck> | null | undefined>(undefined);
   const [selected, setSelected] = useState<SlideId | null>(null);
+  // Layer shown when nothing is selected; with a selection the view follows the selected slide.
+  const [layer, setLayer] = useState(0);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cellWidth, setCellWidth] = useState(loadZoom);
@@ -116,15 +122,30 @@ export default function EditorPage() {
   }, [update, busy]);
 
   const selPos: Pos | null = deck && selected ? posOf(deck, selected) : null;
+  const layers = deck ? layerCount(deck) : 1;
+  const isEmpty = !deck || Object.keys(deck.cells).length === 0;
+  // One past the last layer is a new, empty layer (see "+" in the layer tabs).
+  const viewLayer = selPos ? selPos.z : isEmpty ? 0 : Math.min(layer, layers);
+
+  /** Change the selection; when clearing it, stay on the layer that was being shown. */
+  const select = useCallback((id: SlideId | null, from: Pos | null) => {
+    if (!id && from) setLayer(from.z);
+    setSelected(id);
+  }, []);
+
+  const showLayer = (z: number) => {
+    setSelected(null);
+    setLayer(z);
+  };
 
   const remove = useCallback(
     (p: Pos) => {
       const d = historyRef.current?.present;
       if (!d) return;
       commit(removeSlide(d, p));
-      setSelected(null);
+      select(null, p);
     },
-    [commit],
+    [commit, select],
   );
 
   useEffect(() => {
@@ -146,15 +167,28 @@ export default function EditorPage() {
       if (target.closest('input, textarea')) return;
       const p = selected ? posOf(d, selected) : null;
       const dir = ARROWS[e.key];
+      const depth = e.metaKey || e.ctrlKey || e.altKey ? undefined : DEPTH_KEYS[k];
       if (dir) {
         e.preventDefault();
         if (!p) {
-          setSelected(d.cells[`${d.start.x},${d.start.y}`] ?? null);
+          setSelected(d.cells[key(d.start)] ?? null);
         } else if (e.shiftKey) {
           commit(moveSlide(d, p, step(p, dir)));
         } else {
           const n = neighbor(d, p, dir);
-          if (n) setSelected(d.cells[`${n.x},${n.y}`]);
+          if (n) setSelected(d.cells[key(n)]);
+        }
+      } else if (depth) {
+        e.preventDefault();
+        if (!p) {
+          // Nothing selected: flip through the layers.
+          setLayer((l) => Math.max(0, Math.min(layerCount(d) - 1, l + (depth === 'in' ? 1 : -1))));
+        } else if (e.shiftKey) {
+          // Push the slide one layer deeper / pull it one closer (swapping with any slide there).
+          commit(moveSlide(d, p, step(p, depth)));
+        } else {
+          const n = neighbor(d, p, depth);
+          if (n) setSelected(d.cells[key(n)]);
         }
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && p) {
         e.preventDefault();
@@ -162,12 +196,12 @@ export default function EditorPage() {
       } else if (e.key === 'Enter' && p) {
         startPresenting(navigate, d.id, p);
       } else if (e.key === 'Escape') {
-        setSelected(null);
+        select(null, p);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, commit, remove, navigate, undoLast, redoNext]);
+  }, [selected, commit, remove, navigate, undoLast, redoNext, select]);
 
   async function addFiles(files: File[]) {
     const h = historyRef.current;
@@ -178,7 +212,13 @@ export default function EditorPage() {
     const tag = `import:${Date.now()}`;
     const show = (d: Deck) => update(record(historyRef.current ?? h, d, tag), false);
     try {
-      show(await importFiles(h.present, files, { onProgress: setProgress, onSaved: show }));
+      show(
+        await importFiles(h.present, files, {
+          onProgress: setProgress,
+          onSaved: show,
+          layer: viewLayer,
+        }),
+      );
     } catch (e) {
       setError(`Could not import: ${(e as Error).message}`);
       // Whatever was imported before the failure is already saved; pick up the latest copy so the
@@ -197,8 +237,6 @@ export default function EditorPage() {
         Deck not found. <Link to="/">Back to decks</Link>
       </div>
     );
-
-  const isEmpty = Object.keys(deck.cells).length === 0;
 
   return (
     <div
@@ -285,6 +323,32 @@ export default function EditorPage() {
       </header>
 
       <div className="toolbar" aria-label="Slide actions">
+        {!isEmpty && (
+          <div className="layer-tabs" role="tablist" aria-label="Layers">
+            <span className="muted small">Layer</span>
+            {Array.from({ length: Math.max(layers, viewLayer + 1) }, (_, z) => (
+              <button
+                key={z}
+                role="tab"
+                aria-selected={z === viewLayer}
+                className={z >= layers ? 'new-layer' : undefined}
+                title={z === 0 ? 'Front layer' : `Layer ${z + 1}: behind layer ${z}`}
+                onClick={() => showLayer(z)}
+              >
+                {z + 1}
+              </button>
+            ))}
+            {viewLayer < layers && (
+              <button
+                aria-label="New layer"
+                title="Add a layer behind. Import into it, or move slides there with Shift+Z."
+                onClick={() => showLayer(layers)}
+              >
+                +
+              </button>
+            )}
+          </div>
+        )}
         {selPos ? (
           <>
             <button
@@ -302,14 +366,27 @@ export default function EditorPage() {
             <button onClick={() => commit(insertColumn(deck, selPos.x))}>+ Column left</button>
             <button onClick={() => commit(insertColumn(deck, selPos.x + 1))}>+ Column right</button>
             <span className="sep" />
+            <button
+              title="Move this slide one layer deeper (Shift+Z)"
+              onClick={() => commit(moveSlide(deck, selPos, step(selPos, 'in')))}
+            >
+              Move behind
+            </button>
+            <button
+              title="Move this slide one layer closer (Shift+X)"
+              onClick={() => commit(moveSlide(deck, selPos, step(selPos, 'out')))}
+            >
+              Move in front
+            </button>
+            <span className="sep" />
             <button className="danger" onClick={() => remove(selPos)}>
               Delete
             </button>
           </>
         ) : (
           <span className="muted small">
-            Drag slides to arrange them. ← → move along a row, ↑ ↓ along a column. Select a slide
-            for more options; Shift + arrows moves it.
+            Drag slides to arrange them. ← → move along a row, ↑ ↓ along a column, Z / X in and out
+            of layers. Select a slide for more options; Shift + arrows (or Shift + Z / X) moves it.
           </span>
         )}
       </div>
@@ -330,9 +407,10 @@ export default function EditorPage() {
         ) : (
           <GridCanvas
             deck={deck}
+            layer={viewLayer}
             cellWidth={cellWidth}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={(id) => select(id, selPos)}
             onMove={(from, to) => commit(moveSlide(deck, from, to))}
             onOpen={(p) => startPresenting(navigate, deck.id, p)}
           />

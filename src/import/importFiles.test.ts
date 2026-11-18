@@ -38,7 +38,7 @@ const empty: Deck = {
   updatedAt: 0,
   slides: {},
   cells: {},
-  start: { x: 0, y: 0 },
+  start: { x: 0, y: 0, z: 0 },
 };
 const pdf = (name: string) => new File(['x'], name, { type: 'application/pdf' });
 const count = (d: Deck) => Object.keys(d.slides).length;
@@ -59,8 +59,8 @@ describe('importFiles', () => {
     expect(seen).toEqual([SAVE_EVERY, SAVE_EVERY * 2, pages]);
     expect(count(deck)).toBe(pages);
     // All in one row, in page order.
-    expect(deck.cells['0,0']).toBe('s1');
-    expect(deck.cells[`${pages - 1},0`]).toBe(`s${pages}`);
+    expect(deck.cells['0,0,0']).toBe('s1');
+    expect(deck.cells[`${pages - 1},0,0`]).toBe(`s${pages}`);
   });
 
   test('keeps the slides imported before a failure and says so', async () => {
@@ -76,7 +76,7 @@ describe('importFiles', () => {
     pages = 3;
     const deck = await importFiles(empty, [pdf('a.pdf'), pdf('b.pdf')]);
     expect(count(deck)).toBe(6);
-    expect(Object.keys(deck.cells).filter((k) => k.endsWith(',1'))).toHaveLength(3);
+    expect(Object.keys(deck.cells).filter((k) => k.endsWith(',1,0'))).toHaveLength(3);
   });
 
   test('explains unsupported formats instead of doing nothing', async () => {
