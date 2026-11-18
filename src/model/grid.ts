@@ -82,9 +82,14 @@ export function layerCount(deck: Deck): number {
   return b ? b.maxZ + 1 : 1;
 }
 
-/** How many slides sit behind `p` (same column and row, deeper layers). */
+/**
+ * How many slides are stacked directly behind `p` (same column and row, layers z+1, z+2, … with no
+ * gap), i.e. how far "in" can go from here.
+ */
 export function depthBehind(deck: Deck, p: Pos): number {
-  return occupied(deck).filter((q) => q.x === p.x && q.y === p.y && q.z > p.z).length;
+  let n = 0;
+  while (deck.cells[key({ ...p, z: p.z + n + 1 })]) n++;
+  return n;
 }
 
 /**
@@ -122,7 +127,8 @@ export function migrateDeck(deck: Deck): Deck {
   const cells: Record<CellKey, SlideId> = {};
   for (const [k, id] of Object.entries(deck.cells ?? {})) cells[key(parseKey(k))] = id;
   const s = (deck.start ?? {}) as Partial<Pos>;
-  return { ...deck, cells, start: pos(s.x ?? 0, s.y ?? 0, s.z ?? 0) };
+  // normalize() also repairs a start that doesn't point at a slide (e.g. one that was missing).
+  return normalize({ ...deck, cells, start: pos(s.x ?? 0, s.y ?? 0, s.z ?? 0) });
 }
 
 /** Move the slide at `from` to `to` (any layer); if `to` is occupied the two slides swap. */

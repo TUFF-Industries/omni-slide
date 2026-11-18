@@ -78,6 +78,11 @@ describe('moveSlide', () => {
     expect(d.cells).toEqual({ '0,0,0': 'a', '0,0,1': 'b' });
     expect(depthBehind(d, p(0, 0))).toBe(1);
   });
+  it('depth counts only the slides "in" can reach (no gaps)', () => {
+    const d = deck({ '0,0,0': 'a', '1,0,1': 'b', '0,0,2': 'c', '0,0,3': 'd' });
+    expect(depthBehind(d, p(0, 0, 0))).toBe(0); // nothing at (0,0,1)
+    expect(depthBehind(d, p(0, 0, 2))).toBe(1);
+  });
   it('moving a slide in front of layer 0 pushes every other layer back', () => {
     const d = moveSlide(deck({ '0,0': 'a', '1,0': 'b' }), p(1, 0), p(1, 0, -1));
     expect(d.cells).toEqual({ '1,0,0': 'b', '0,0,1': 'a' });
@@ -120,6 +125,11 @@ describe('migrateDeck', () => {
     const d = migrateDeck(old);
     expect(d.cells).toEqual({ '0,0,0': 'a', '1,0,0': 'b' });
     expect(d.start).toEqual(p(1, 0, 0));
+  });
+  it('repairs a missing start', () => {
+    const old = { ...deck({}), cells: { '2,1': 'a' }, start: undefined } as unknown as Deck;
+    expect(migrateDeck(old).start).toEqual(p(0, 0, 0));
+    expect(migrateDeck(old).cells).toEqual({ '0,0,0': 'a' });
   });
   it('leaves current decks unchanged', () => {
     const d = deck({ '0,0,0': 'a', '0,0,1': 'b' }, p(0, 0, 1));

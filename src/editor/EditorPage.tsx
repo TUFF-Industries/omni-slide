@@ -62,6 +62,8 @@ export default function EditorPage() {
   const [selected, setSelected] = useState<SlideId | null>(null);
   // Layer shown when nothing is selected; with a selection the view follows the selected slide.
   const [layer, setLayer] = useState(0);
+  // True after "+" (new layer): the view may then sit one past the last layer, on an empty one.
+  const [addingLayer, setAddingLayer] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cellWidth, setCellWidth] = useState(loadZoom);
@@ -124,18 +126,27 @@ export default function EditorPage() {
   const selPos: Pos | null = deck && selected ? posOf(deck, selected) : null;
   const layers = deck ? layerCount(deck) : 1;
   const isEmpty = !deck || Object.keys(deck.cells).length === 0;
-  // One past the last layer is a new, empty layer (see "+" in the layer tabs).
-  const viewLayer = selPos ? selPos.z : isEmpty ? 0 : Math.min(layer, layers);
+  // Clamped, because deleting or undoing can remove layers. Only "+" may show the empty layer one
+  // past the last.
+  const viewLayer = selPos
+    ? selPos.z
+    : isEmpty
+      ? 0
+      : Math.min(layer, addingLayer ? layers : layers - 1);
 
   /** Change the selection; when clearing it, stay on the layer that was being shown. */
   const select = useCallback((id: SlideId | null, from: Pos | null) => {
-    if (!id && from) setLayer(from.z);
+    if (!id && from) {
+      setLayer(from.z);
+      setAddingLayer(false);
+    }
     setSelected(id);
   }, []);
 
   const showLayer = (z: number) => {
     setSelected(null);
     setLayer(z);
+    setAddingLayer(z >= layers);
   };
 
   const remove = useCallback(
@@ -183,6 +194,7 @@ export default function EditorPage() {
         if (!p) {
           // Nothing selected: flip through the layers.
           setLayer((l) => Math.max(0, Math.min(layerCount(d) - 1, l + (depth === 'in' ? 1 : -1))));
+          setAddingLayer(false);
         } else if (e.shiftKey) {
           // Push the slide one layer deeper / pull it one closer (swapping with any slide there).
           commit(moveSlide(d, p, step(p, depth)));
